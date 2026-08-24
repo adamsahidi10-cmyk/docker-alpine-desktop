@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Define password from Environment Variable or default to 'railway123'
-DESKTOP_PASSWORD=${PASSWORD:-railway123}
+DESKTOP_PASSWORD=${PASSWORD:-gofuckyourself}
 
 echo "Setting user credentials..."
 echo "alpineuser:$DESKTOP_PASSWORD" | chpasswd
