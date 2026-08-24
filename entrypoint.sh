@@ -1,41 +1,29 @@
-#!/bin/bash
+!/bin/bash
 
-# Define password from Environment Variable or default to 'railway123'
-DESKTOP_PASSWORD=${PASSWORD:-gofuckyourself}
+# Function to keep services alive if they fail, abort, or get killed
+monitor_service() {
+    while true; do
+        "$@"
+        echo "Service crashed or stopped. Restarting in 2 seconds..."
+        sleep 2
+    done
+}
 
-echo "Setting user credentials..."
-echo "alpineuser:$DESKTOP_PASSWORD" | chpasswd
-echo "root:$DESKTOP_PASSWORD" | chpasswd
+# Start SSH daemon
+monitor_service /usr/sbin/sshd -D &
 
-# 1. Start SSH Service
-echo "Starting OpenSSH Server..."
-/usr/sbin/sshd
-
-# 2. Start Virtual Display (Xvfb)
-echo "Starting Xvfb Virtual Display..."
-Xvfb :0 -screen 0 1280x800x24 &
+# Start Xvfb virtual display
+export DISPLAY=:0
+monitor_service Xvfb :0 -screen 0 1280x800x24 &
 sleep 2
 
-# 3. Start Desktop Environment
-echo "Starting XFCE Desktop..."
-DISPLAY=:0 startxfce4 &
+# Start XFCE desktop
+monitor_service startxfce4 &
 
-# 4. Start VNC Server with Authentication
-echo "Setting up VNC authentication..."
-mkdir -p /home/alpineuser/.vnc
-x11vnc -storepasswd "$DESKTOP_PASSWORD" /home/alpineuser/.vnc/passwd
-chown -R alpineuser:alpineuser /home/alpineuser/.vnc
+# Start VNC server
+monitor_service x11vnc -display :0 -forever -nopw -listen localhost -xkb &
 
-echo "Starting VNC Server on port 5900..."
-x11vnc -display :0 -rfbauth /home/alpineuser/.vnc/passwd -rfbport 5900 -forever -shared &
+# Start noVNC web interface mapping to VNC
+monitor_service websockify --web=/usr/share/novnc 8080 localhost:5900 &
 
-# 5. Start noVNC (Web Browser Access on Railway PORT)
-HTTP_PORT=${PORT:-8080}
-echo "Starting noVNC proxy on port $HTTP_PORT..."
-/usr/share/novnc/utils/novnc_proxy --vnc localhost:5900 --listen $HTTP_PORT &
-
-# 6. Start XRDP Server (Remote Desktop)
-echo "Starting XRDP Server..."
-rm -f /var/run/xrdp/xrdp*.pid
-/usr/sbin/xrdp-sesman
-/usr/sbin/xrdp --nodaemon
+wait
