@@ -1,43 +1,49 @@
-FROM alpine:3.19
+FROM alpine:latest
 
-# تثبيت الواجهة الرسومية XFCE وبيئات الاتصال SSH و RDP و VNC وأدوات المظهر
-RUN apk update && apk add --no-cache \
-    xfce4 \
-    xfce4-terminal \
-    xfconf \
-    gstreamer \
-    gst-plugins-good \
-    xrdp \
-    xvfb \
-    x11vnc \
-    openssh \
-    supervisor \
+# Set environment variables
+ENV DEBIAN_FRONTEND=noninteractive \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
+
+# Install XFCE4, X11, XRDP, VNC, SSH, noVNC, and themes
+RUN apk add --no-cache \
     bash \
     sudo \
-    util-linux \
-    dbus \
-    ttf-dejavu \
-    faenza-icon-theme
+    curl \
+    wget \
+    openssh \
+    xorg-server \
+    xfce4 \
+    xfce4-terminal \
+    xfce4-panel \
+    faenza-icon-theme \
+    x11vnc \
+    xvfb \
+    xrdp \
+    xorgxrdp \
+    novnc \
+    websockify \
+    python3 \
+    dbus
 
-# إعداد مستخدم النظام وتعيين كلمة المرور للـ root والاتصالات عن بعد
-RUN echo "root:mrcracker" | chpasswd
+# Create a non-root desktop user
+RUN adduser -D -s /bin/bash alpineuser && \
+    echo "alpineuser ALL=(ALL) ALL" >> /etc/sudoers
 
-# إعداد خدمة SSH وتفعيل صلاحيات الدخول للـ root
+# Configure OpenSSH
 RUN ssh-keygen -A && \
-    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
 
-# إعداد وتكوين خادم XRDP (RDP) ليعمل مع واجهة XFCE
-RUN mkdir -p /var/run/xrdp && \
-    chmod 755 /var/run/xrdp && \
-    echo "xfce4-session" > /root/.xsession
+# Set up XFCE startup for RDP and VNC
+RUN echo "exec startxfce4" > /home/alpineuser/.xsession && \
+    chown alpineuser:alpineuser /home/alpineuser/.xsession
 
-# إعداد ملفات التكوين لأداة Supervisor لإدارة تشغيل الخدمات معاً
-RUN mkdir -p /etc/supervisor.d/
-COPY supervisord.conf /etc/supervisor.d/supervisord.ini
+# Expose default ports
+EXPOSE 8080 22 3389 5900
 
-# فتح المنافذ الخاصة بـ SSH و RDP و VNC
-EXPOSE 22 3389 5900
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
 
-# تشغيل أداة مدير العمليات لتشغيل كافة الواجهات والخدمات تلقائياً
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.d/supervisord.ini"]
+ENTRYPOINT ["/entrypoint.sh"]
