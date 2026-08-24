@@ -1,15 +1,14 @@
-FROM alpine:3.20
+FROM voidlinux/voidlinux:latest
 
-# Install XFCE core, light utilities, and the ultra-light Midori browser
-RUN apk update && apk add --no-cache \
-    xfce4 \
-    xfce4-terminal \
-    xvfb \
+# Update system and install the absolute bare minimum for a GUI
+RUN xbps-install -Syu && xbps-install -y \
+    openbox \
+    xterm \
+    xorg-server-xvfb \
     x11vnc \
     supervisor \
     bash \
     novnc \
-    midori \
     && ln -s /usr/share/novnc/vnc.html /usr/share/novnc/index.html
 
 # Environmental settings
@@ -17,7 +16,7 @@ ENV DISPLAY=:1
 
 COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 
-# Permissions for Railway's ephemeral container structure
+# Match Railway's ephemeral runtime permissions
 RUN chmod -R 777 /tmp
 
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
