@@ -20,7 +20,7 @@ RUN apk update && apk add --no-cache \
     faenza-icon-theme
 
 # إعداد مستخدم النظام وتعيين كلمة المرور للـ root والاتصالات عن بعد
-RUN echo "root:RailwayDocker2026!" | chpasswd
+RUN echo "root:mrcracker" | chpasswd
 
 # إعداد خدمة SSH وتفعيل صلاحيات الدخول للـ root
 RUN ssh-keygen -A && \
