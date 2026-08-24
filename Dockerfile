@@ -1,42 +1,43 @@
-# Use Alpine Linux as the base image
-FROM alpine:3.18
+FROM alpine:3.19
 
-# Install system dependencies, XFCE desktop, and tools
+# تثبيت الواجهة الرسومية XFCE وبيئات الاتصال SSH و RDP و VNC وأدوات المظهر
 RUN apk update && apk add --no-cache \
-    openssh \
-    bash \
-    sudo \
-    supervisor \
-    xvfb \
-    x11vnc \
-    dbus \
-    ttf-dejavu \
-    # XFCE Desktop Ecosystem
     xfce4 \
     xfce4-terminal \
-    xfce4-screenshooter \
-    thunar \
-    faenza-icon-theme \
-    # XRDP Requirements
+    xfconf \
+    gstreamer \
+    gst-plugins-good \
     xrdp \
-    xvfb-run
+    xvfb \
+    x11vnc \
+    openssh \
+    supervisor \
+    bash \
+    sudo \
+    util-linux \
+    dbus \
+    ttf-dejavu \
+    faenza-icon-theme
 
-# Configure SSH
+# إعداد مستخدم النظام وتعيين كلمة المرور للـ root والاتصالات عن بعد
+RUN echo "root:RailwayDocker2026!" | chpasswd
+
+# إعداد خدمة SSH وتفعيل صلاحيات الدخول للـ root
 RUN ssh-keygen -A && \
-    echo "root:RailwayDocker2026!" | chpasswd && \
-    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config
+    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config && \
+    sed -i 's/#PasswordAuthentication.*/PasswordAuthentication yes/' /etc/ssh/sshd_config
 
-# Configure XRDP and XFCE Session
-RUN echo "xfce4-session" > ~/.xsession && \
-    sed -i 's/allowed_users=console/allowed_users=anybody/' /etc/xrdp/Xwrapper.config
+# إعداد وتكوين خادم XRDP (RDP) ليعمل مع واجهة XFCE
+RUN mkdir -p /var/run/xrdp && \
+    chmod 755 /var/run/xrdp && \
+    echo "xfce4-session" > /root/.xsession
 
-# Create Supervisor configuration for multi-process management
-RUN mkdir -p /etc/supervisor/conf.d
-COPY supervisord.conf /etc/supervisor/supervisord.conf
+# إعداد ملفات التكوين لأداة Supervisor لإدارة تشغيل الخدمات معاً
+RUN mkdir -p /etc/supervisor.d/
+COPY supervisord.conf /etc/supervisor.d/supervisord.ini
 
-# Expose required ports (SSH: 22, RDP: 3389, VNC: 5900, Web VNC Alternative: 8080)
-EXPOSE 22 3389 5900 8080
+# فتح المنافذ الخاصة بـ SSH و RDP و VNC
+EXPOSE 22 3389 5900
 
-# Start Supervisor to run all services simultaneously
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]
+# تشغيل أداة مدير العمليات لتشغيل كافة الواجهات والخدمات تلقائياً
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor.d/supervisord.ini"]
