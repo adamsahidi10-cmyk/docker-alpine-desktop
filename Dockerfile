@@ -28,8 +28,8 @@ RUN apk add --no-cache \
     dbus
 
 # Create a non-root desktop user
-RUN adduser -D -s /bin/bash alpineuser && \
-    echo "alpineuser ALL=(ALL) ALL" >> /etc/sudoers
+RUN adduser -D -s /bin/bash luffy && \
+    echo "luffy ALL=(ALL) ALL" >> /etc/sudoers
 
 # Configure OpenSSH
 RUN ssh-keygen -A && \
