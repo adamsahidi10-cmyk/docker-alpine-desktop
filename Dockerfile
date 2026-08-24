@@ -1,46 +1,43 @@
-FROM alpine:edge
+# Use the highly stable, production-tested Alpine XFCE base image from GitHub
+FROM jlesage/baseimage-gui:alpine-3.18-xfce-v4
 
-# Install essential system packages, XFCE desktop environment, supervisor, and themes
+# Install SSH server, Git, and build tools for themes
 RUN apk update && apk add --no-cache \
+    openssh \
     bash \
     curl \
-    openssh \
-    xvfb \
-    x11vnc \
-    novnc \
-    websockify \
-    xfce4 \
-    xfce4-terminal \
-    dbus-x11 \
-    udev \
     sudo \
-    supervisor \
     git \
-    gstreamer
+    gnome-themes-extra
 
-# Create user luffy and assign password
+# Create user luffy and set password
 RUN adduser -D -s /bin/bash luffy && \
     echo "luffy:luffy@2000" | chpasswd && \
     echo "luffy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Download and install WhiteSur macOS theme directly to system space
+# Generate host keys for SSH and configure it to run in the background
+RUN ssh-keygen -A && \
+    mkdir -p /var/run/sshd && \
+    echo "PermitRootLogin yes" >> /etc/ssh/sshd_config
+
+# Clone and install the WhiteSur macOS GTK theme globally
 RUN git clone https://github.com /tmp/whitesur && \
     cd /tmp/whitesur && \
     ./install.sh -t all -s all && \
     rm -rf /tmp/whitesur
 
-# Generate host keys and establish vital socket system directory paths
-RUN ssh-keygen -A && \
-    mkdir -p /var/run/sshd /var/log/supervisor /tmp/.X11-unix && \
-    chmod 1777 /tmp/.X11-unix
+# Set up automatic initialization for the SSH server inside the base init system
+RUN mkdir -p /etc/services.d/sshd && \
+    echo '#!/with-contenv sh' > /etc/services.d/sshd/run && \
+    echo 'exec /usr/sbin/sshd -D' >> /etc/services.d/sshd/run && \
+    chmod +x /etc/services.d/sshd/run
 
-# Force WhiteSur UI configuration defaults down to the luffy home directory path profile
-RUN mkdir -p /home/luffy/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
-    echo '<?xml version="1.0" encoding="UTF-8"?><channel name="xsettings" version="1.0"><property name="Net" type="empty"><property name="ThemeName" type="string" value="WhiteSur-Light"/></property></channel>' > /home/luffy/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
-    chown -R luffy:luffy /home/luffy/.config
+# Configure environment variables required by the GitHub base image
+ENV APP_NAME="Railway macOS Desktop" \
+    USER_ID=1000 \
+    GROUP_ID=1000 \
+    DISPLAY_WIDTH=1280 \
+    DISPLAY_HEIGHT=800
 
-COPY supervisord.conf /etc/supervisord.conf
-
-EXPOSE 22 8080 5900
-
-CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
+# Expose noVNC web access port (5800 is the default port for this base image) and SSH (22)
+EXPOSE 5800 22
