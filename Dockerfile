@@ -1,6 +1,6 @@
 FROM alpine:edge
 
-# Install essential packages, desktop, and tools
+# Install essential system packages, XFCE, supervisor, and theme compilation tools
 RUN apk update && apk add --no-cache \
     bash \
     curl \
@@ -13,21 +13,35 @@ RUN apk update && apk add --no-cache \
     xfce4-terminal \
     dbus-x11 \
     eudev \
-    sudo
+    sudo \
+    supervisor \
+    git \
+    gtk-murrine-engine \
+    gstreamer
 
-# Create user luffy
+# Create user luffy and assign to appropriate system groups
 RUN adduser -D -s /bin/bash luffy && \
     echo "luffy:luffy@2000" | chpasswd && \
     echo "luffy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Configure SSH
-RUN ssh-keygen -A
-RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
+# Download and install WhiteSur macOS theme globally
+RUN git clone https://github.com /tmp/whitesur && \
+    cd /tmp/whitesur && \
+    ./install.sh -t all -s all && \
+    rm -rf /tmp/whitesur
 
-# Setup startup script
-COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+# Create mandatory runtime directories to prevent process initialization failures
+RUN ssh-keygen -A && \
+    mkdir -p /var/run/sshd /var/log/supervisor /tmp/.X11-unix && \
+    chmod 1777 /tmp/.X11-unix
+
+# Apply WhiteSur theme configuration directly for user luffy
+RUN mkdir -p /home/luffy/.config/xfce4/xfconf/xfce-perchannel-xml/ && \
+    echo '<?xml version="1.0" encoding="UTF-8"?><channel name="xsettings" version="1.0"><property name="Net" type="empty"><property name="ThemeName" type="string" value="WhiteSur-Light"/></property></channel>' > /home/luffy/.config/xfce4/xfconf/xfce-perchannel-xml/xsettings.xml && \
+    chown -R luffy:luffy /home/luffy/.config
+
+COPY supervisord.conf /etc/supervisord.conf
 
 EXPOSE 22 8080 5900
 
-CMD ["/entrypoint.sh"]
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisord.conf"]
