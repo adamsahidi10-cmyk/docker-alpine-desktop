@@ -1,49 +1,33 @@
-FROM alpine:latest
+FROM alpine:edge
 
-# Set environment variables
-ENV DEBIAN_FRONTEND=noninteractive \
-    LANG=en_US.UTF-8 \
-    LANGUAGE=en_US:en \
-    LC_ALL=en_US.UTF-8
-
-# Install XFCE4, X11, XRDP, VNC, SSH, noVNC, and themes
-RUN apk add --no-cache \
+# Install essential packages, desktop, and tools
+RUN apk update && apk add --no-cache \
     bash \
-    sudo \
     curl \
-    wget \
     openssh \
-    xorg-server \
-    xfce4 \
-    xfce4-terminal \
-    xfce4-panel \
-    faenza-icon-theme \
-    x11vnc \
     xvfb \
-    xrdp \
-    xorgxrdp \
+    x11vnc \
     novnc \
     websockify \
-    python3 \
-    dbus
+    xfce4 \
+    xfce4-terminal \
+    dbus-x11 \
+    eudev \
+    sudo
 
-# Create a non-root desktop user
+# Create user luffy
 RUN adduser -D -s /bin/bash luffy && \
-    echo "luffy ALL=(ALL) ALL" >> /etc/sudoers
+    echo "luffy:luffy@2000" | chpasswd && \
+    echo "luffy ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
 
-# Configure OpenSSH
-RUN ssh-keygen -A && \
-    sed -i 's/#PasswordAuthentication yes/PasswordAuthentication yes/' /etc/ssh/sshd_config && \
-    sed -i 's/#PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
+# Configure SSH
+RUN ssh-keygen -A
+RUN sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin yes/' /etc/ssh/sshd_config
 
-# Set up XFCE startup for RDP and VNC
-RUN echo "exec startxfce4" > /home/alpineuser/.xsession && \
-    chown alpineuser:alpineuser /home/alpineuser/.xsession
-
-# Expose default ports
-EXPOSE 8080 22 3389 5900
-
+# Setup startup script
 COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
-ENTRYPOINT ["/entrypoint.sh"]
+EXPOSE 22 8080 5900
+
+CMD ["/entrypoint.sh"]
